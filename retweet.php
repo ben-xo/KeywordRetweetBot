@@ -28,7 +28,7 @@ require_once("twitter.oauth.class.php");
 require_once("twitter.class.php");
 
 /* 
- *retweet.php <app config file> <session file> <watermark file> <user from> <keyword> [<keyword> ...] [--dry-run]
+ * retweet.php <app config file> <session file> <watermark file> <user from> <keyword> [<keyword> ...] [--dry-run]
  */
 
 class KeywordRetweetBot {
@@ -65,7 +65,7 @@ class KeywordRetweetBot {
 
     private function parse_options($argc, $argv) {
         if ($argc < 6) {
-            throw new RuntimeException("Usage: retweet.php <app config file> <session file> <user from> <since id> <keyword> [--dry-run]", 1);
+            throw new RuntimeException("Usage: retweet.php <app config file> <session file> <user from> <keyword> [<keyword> ...] [--dry-run]", 1);
         }
 
         $appname = array_shift($argv);
@@ -126,7 +126,12 @@ class KeywordRetweetBot {
     }    
 
     private function save_new_watermark($watermark_file, $watermark) {
-        file_put_contents($watermark_file, $watermark."\n");
+        if(!$this->dry_run) {
+            file_put_contents($watermark_file, $watermark."\n");
+            echo "Saved new watermark of $watermark\n";
+        } else {
+            echo "Didn't save new watermark because in --dry-run mode\n";
+        }
     }    
 
     private function get_relevant_tweets($from_user, $since_id, $keywords)
