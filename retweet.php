@@ -55,10 +55,11 @@ class KeywordRetweetBot {
             $this->keywords[] = $keyword;
         }
 
-        if($keyword == "--dry-run") {
+        if($this->keywords[count($this->keywords) - 1] == "--dry-run") {
             # last keyword was --dry-run
             $this->dry_run = true;
             array_pop($this->keywords);
+            echo "DRY RUN MODE\n";
         }
     }
 
@@ -109,8 +110,9 @@ class KeywordRetweetBot {
         $remaining_tweets = true;
         $this->new_watermark = $since_id;
         $retweet_ids = array();
+        $keywords_text = implode(', ', $this->keywords);
         while($remaining_tweets) {
-            echo "Fetching tweets newer than {$this->new_watermark}...\n";
+            echo "Fetching tweets newer than {$this->new_watermark} with keywords $keywords_text...\n";
             $tweets = $this->get_relevant_tweets_page($from_user, $this->new_watermark);
             if(empty($tweets)) {
                 $remaining_tweets = false;
@@ -135,6 +137,7 @@ class KeywordRetweetBot {
         }
         $this->save_new_watermark($this->watermark_file, $this->new_watermark);
         echo "Done.\n";
+        return $retweet_ids;
     }
 
     private function get_relevant_tweets_page($from_user, $since_id)
@@ -143,17 +146,25 @@ class KeywordRetweetBot {
             'screen_name' => $from_user,
             'since_id' => $since_id, 
             'count' => 200
-        ));        
+        ));
     }
 
     private function dump_tweets($relevant_tweets)
     {
-        throw new Exception(__METHOD__ . " not implemented yet");
+        echo "Would retweet the following tweets:\n";
+        foreach($relevant_tweets as $tweet_id)
+        {
+            echo "* https://twitter.com/{$this->from_user}/status/$tweet_id\n";
+        }
     }
 
     private function retweet_all($relevant_tweets)
     {
-        throw new Exception(__METHOD__ . " not implemented yet");
+        foreach($relevant_tweets as $tweet_id)
+        {
+            echo "Retweeting https://twitter.com/{$this->from_user}/status/$tweet_id\n";
+            $this->twitter_client->request("statuses/retweet/$tweet_id", 'POST', array());
+        }
     }
 }
 
