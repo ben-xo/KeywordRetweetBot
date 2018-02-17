@@ -4,7 +4,7 @@ require_once("twitter.oauth.class.php");
 require_once("twitter.class.php");
 
 /* 
- *retweet.php <app config file> <session file> <watermark file> <user from> <keyword> [--dry-run]
+ *retweet.php <app config file> <session file> <watermark file> <user from> <keyword> [<keyword> ...] [--dry-run]
  */
 
 class KeywordRetweetBot {
@@ -17,7 +17,7 @@ class KeywordRetweetBot {
     private $from_user;
     private $since_id;
     private $new_watermark;
-    private $keyword;
+    private $keywords = array();
     
     private $twitter_client;
     
@@ -25,7 +25,7 @@ class KeywordRetweetBot {
         $this->parse_options($argc, $argv);
         $since_id = $this->load_watermark_file($this->watermark_file);
         $this->init_twitter_client($this->app_config_file, $this->session_file);
-        $relevant_tweets = $this->get_relevant_tweets($this->from_user, $since_id, $this->keyword);
+        $relevant_tweets = $this->get_relevant_tweets($this->from_user, $since_id, $this->keywords);
         if($this->dry_run) {
             $this->dump_tweets($relevant_tweets);
         } else {
@@ -50,11 +50,15 @@ class KeywordRetweetBot {
         $this->session_file = array_shift($argv);
         $this->watermark_file = array_shift($argv);
         $this->from_user = array_shift($argv);
-        $this->keyword = array_shift($argv);
 
-        $dry_run = array_shift($argv);
-        if($dry_run == "--dry-run") {
+        while ($keyword = array_shift($argv)) {
+            $this->keywords[] = $keyword;
+        }
+
+        if($keyword == "--dry-run") {
+            # last keyword was --dry-run
             $this->dry_run = true;
+            array_pop($this->keywords);
         }
     }
 
@@ -100,14 +104,14 @@ class KeywordRetweetBot {
         file_put_contents($watermark_file, $watermark."\n");
     }    
 
-    private function get_relevant_tweets($from_user, $since_id, $keyword)
+    private function get_relevant_tweets($from_user, $since_id, $keywords)
     {
         $remaining_tweets = true;
         $this->new_watermark = $since_id;
         $retweet_ids = array();
         while($remaining_tweets) {
-            echo "Fetching tweets newer than $most_recent_seen_id...\n";
-            $tweets = $this->get_relevant_tweets_page($from_user, $this->new_watermark, $keyword);
+            echo "Fetching tweets newer than {$this->new_watermark}...\n";
+            $tweets = $this->get_relevant_tweets_page($from_user, $this->new_watermark);
             if(empty($tweets)) {
                 $remaining_tweets = false;
             } else {
@@ -116,7 +120,13 @@ class KeywordRetweetBot {
                     if($tweet->id_str > $this->new_watermark) {
                         $this->new_watermark = $tweet->id_str;
                     }
-                    if(strstr($tweet->text, $keyword)) {
+                    $found = 0;
+                    foreach ($this->keywords as $keyword) {
+                        if(strstr($tweet->text, $keyword)) {
+                            $found++;
+                        }
+                    }
+                    if($found == count($this->keywords)) {
                         echo "FOUND: " . $tweet->text . "\n";
                         $retweet_ids[] = $tweet->id_str;
                     }
@@ -127,7 +137,7 @@ class KeywordRetweetBot {
         echo "Done.\n";
     }
 
-    private function get_relevant_tweets_page($from_user, $since_id, $keyword)
+    private function get_relevant_tweets_page($from_user, $since_id)
     {
         return $this->twitter_client->request('statuses/user_timeline', 'GET', array(
             'screen_name' => $from_user,
